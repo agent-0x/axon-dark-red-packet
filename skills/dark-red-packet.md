@@ -37,7 +37,7 @@ Poseidon 预编译: 0x0000000000000000000000000000000000000810
   提交真实金额 + 秘密随机数
   合约验证哈希是否匹配
 
-阶段 3: SETTLE（开奖）
+阶段 3: 开奖
   链上随机排序所有参与者
   按顺序处理: 出价 ≤ 剩余 → 抢到，出价 > 剩余 → 空手
 ```
@@ -47,13 +47,12 @@ Poseidon 预编译: 0x0000000000000000000000000000000000000810
 开奖时的处理顺序由链上数据决定，commit 和 reveal 阶段无人能预测：
 
 ```
-随机种子 = keccak256(block.prevrandao, block.timestamp, block.number, settle调用者地址, packetId)
+随机种子 = keccak256(block.prevrandao, block.timestamp, block.number, 开奖触发者地址, packetId)
 排序算法 = Fisher-Yates shuffle（用种子逐步生成随机交换位置）
 ```
 
-- `block.prevrandao` / `block.timestamp` / `block.number` 在 settle 交易被打包时才确定
-- commit 和 reveal 阶段这些值尚不存在，所以无法提前预测排序
-- settle 可以由任何人触发（不限于发红包者或参与者）
+- 这些值在开奖交易被打包时才确定，暗标和揭示阶段尚不存在，无法提前预测
+- 开奖可以由任何人触发（不限于发红包者或参与者）
 
 ### 费用
 
@@ -192,10 +191,10 @@ result = rpc_call("eth_sendRawTransaction", [raw])
 print(f"Reveal TX: {result.get('result', result)}")
 ```
 
-### 第四步: 等 reveal 结束，SETTLE + WITHDRAW
+### 第四步: 等揭示结束，开奖 + 提取
 
 ```python
-# 任何人都可以触发 settle
+# 任何人都可以触发开奖
 sel_settle = keccak(b"settle(uint256)")[:4]
 tx_data = "0x" + sel_settle.hex() + encode(["uint256"], [PACKET_ID]).hex()
 # ... 发送交易 ...
@@ -243,7 +242,7 @@ if winnings > 0:
 
 - 没人 commit → reveal 结束后发红包者调 `creatorReclaim(packetId)` → 全额拿回红包，无损失
 - 有人 commit 但没 reveal → 参与费归发红包者，红包金额全额退回
-- 有人 reveal → 必须走 `settle()` 流程正常结算
+- 有人揭示了 → 必须走 `settle()` 开奖流程正常结算
 
 ### 创建红包
 
@@ -280,7 +279,7 @@ print(f"Create TX: {result.get('result', result)}")
 ### 结算后提取余额和参与费
 
 ```python
-# settle 后，发红包者调 creatorWithdraw 取回未被抢完的部分 + 参与费
+# 开奖后，发红包者调 creatorWithdraw 取回未被抢完的部分 + 参与费
 sel = keccak(b"creatorWithdraw(uint256)")[:4]
 tx_data = "0x" + sel.hex() + encode(["uint256"], [PACKET_ID]).hex()
 # ... 发送交易 ...
@@ -429,11 +428,11 @@ while True:
                     pending_reveals[pid]["revealed"] = True
 
             elif block > info["reveal_dl"] and not p["settled"]:
-                # reveal 结束 → 触发 settle
+                # 揭示结束 → 触发开奖
                 sel = keccak(b"settle(uint256)")[:4]
                 data = "0x" + sel.hex() + encode(["uint256"], [pid]).hex()
                 send_tx(data, gas=1000000)
-                print(f"🎲 Settle 红包#{pid}")
+                print(f"🎲 开奖 红包#{pid}")
 
             elif p["settled"]:
                 # 已结算 → 检查赢额并提取
@@ -474,7 +473,7 @@ python bot.py
 | `Revealed(packetId, participant)` | 有人揭示 |
 | `Grabbed(packetId, participant, amount, order)` | 抢到了 |
 | `Greedy(packetId, participant, amount, order)` | 太贪了，空手 |
-| `Settled(packetId, totalGrabbed, returnedToCreator, fee)` | 结算完成 |
+| `Settled(packetId, totalGrabbed, returnedToCreator, fee)` | 开奖完成 |
 | `Withdrawn(packetId, participant, amount)` | 提取奖金 |
 
 ---
