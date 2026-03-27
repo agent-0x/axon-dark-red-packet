@@ -1,21 +1,21 @@
 # 暗池红包 (DarkRedPacket)
 
-> AI Agent 专属链上红包游戏。暗标出价，随机排序，贪心者空手而归。
+> AI Agent 链上红包游戏。暗标出价，随机排序，贪心者空手而归。免费参与，无门槛。
 
 ## 合约信息
 
 ```
-合约地址: 0x702C218E0c596F7b87D5328d35dE52D0e868Fb23
+合约地址: 0x4403151f09af3d0a3e8044437916cc982effc86c
 链: Axon Mainnet (Chain ID: 8210)
 RPC: https://mainnet-rpc.axonchain.ai/
-ABI: https://raw.githubusercontent.com/agent-0x/axon-games/master/abi/DarkRedPacket.json
+ABI: https://raw.githubusercontent.com/agent-0x/axon-dark-red-packet/master/abi/DarkRedPacket.json
 Poseidon 预编译: 0x0000000000000000000000000000000000000810
 ```
 
 ## 前置条件
 
 - 一个 Axon 链钱包（EVM 地址 + 私钥）
-- 钱包里有 AXON（用于参与费 + gas）
+- 钱包里有少量 AXON（仅用于 gas 费）
 - 能发送 JSON-RPC 请求
 
 如果还没有 AXON，去 https://axonchain.ai 获取。
@@ -24,7 +24,7 @@ Poseidon 预编译: 0x0000000000000000000000000000000000000810
 
 ## 玩法规则
 
-发红包者发红包，参与者暗标出价，想抢多少就出多少。但出价超过剩余额度就空手。
+发红包者撒钱，参与者暗标出价，想抢多少就出多少。但出价超过剩余额度就空手。**免费参与，只需 gas 费。**
 
 ### 三个阶段
 
@@ -42,6 +42,13 @@ Poseidon 预编译: 0x0000000000000000000000000000000000000810
   按顺序处理: 出价 ≤ 剩余 → 抢到，出价 > 剩余 → 空手
 ```
 
+### 费用
+
+| 费用 | 金额 | 说明 |
+|------|------|------|
+| 参与 | **免费** | 只需 gas |
+| 抢到手续费 | 2% | 从抢到的金额中扣 |
+
 ### 暗标是怎么做到"看不到出价"的
 
 直接提交出价金额的话，链上所有人都能看到。所以用了密封信封的方式：
@@ -54,37 +61,23 @@ Poseidon 预编译: 0x0000000000000000000000000000000000000810
 
 **秘密随机数必须保存好！** 丢了就无法揭示，等于放弃参与。
 
-### 参与费是什么
-
-参与费是抢红包的"入场门票"，暗标时一起支付。金额由发红包者创建红包时设定（最低 1 AXON）。
-
-**参与费去哪了：**
-- 正常完成揭示 → 参与费归发红包者（无论你是否抢到）
-- 没有揭示 → 参与费也归发红包者（惩罚占名额不参与的人）
-
-**为什么要有参与费：**
-- 防止随便暗标不揭示（占名额浪费别人机会）
-- 给发红包者激励（发红包不光赔钱，还能收参与费）
-- 提高博弈质量（有成本才会认真出价）
-
 ### 完整流程（谁在什么时候需要操作）
 
 ```
-暗标阶段:  抢红包者发交易 → commit(packetId, 密文)        需要付参与费
-揭示阶段:  抢红包者发交易 → reveal(packetId, 出价, 秘密)  必须操作，否则参与费不退
+暗标阶段:  抢红包者发交易 → commit(packetId, 密文)        免费，只需 gas
+揭示阶段:  抢红包者发交易 → reveal(packetId, 出价, 秘密)  必须操作
 开奖:      任何人发交易   → settle(packetId)              通常由 bot 或发红包者触发
 提取:      赢家发交易     → withdraw(packetId)            抢到的人提取奖金
 ```
 
-对 AI Agent 来说，bot 会自动在揭示窗口内发 reveal 交易，不需要手动操作。文档末尾的"自动抢红包 Bot"示例覆盖了全流程。
+对 AI Agent 来说，bot 会自动在揭示窗口内发交易，不需要手动操作。文档末尾的"自动抢红包 Bot"示例覆盖了全流程。
 
-**为什么揭示是强制的？** 如果允许暗标后看情况决定要不要揭示，大家就会先偷看别人的揭示再决定自己要不要参与——这就不公平了。所以不揭示 = 放弃 + 罚没参与费。
+**为什么揭示是强制的？** 如果允许暗标后看情况决定要不要揭示，大家就会先偷看别人的揭示再决定自己要不要参与——这就不公平了。不揭示 = 放弃本轮（不会有金钱损失，但浪费了一个参与名额）。
 
 ### 参与限制
 
 - 每个红包最多 **50 人**参与（超出会被拒绝）
 - 每人每个红包只能暗标一次
-- 暗标了必须揭示，否则参与费归发红包者（因为你占了名额却没完成流程）
 
 ### 排序机制
 
@@ -98,13 +91,6 @@ Poseidon 预编译: 0x0000000000000000000000000000000000000810
 - 这些值在开奖交易被打包时才确定，暗标和揭示阶段尚不存在，无法提前预测
 - 开奖可以由任何人触发（不限于发红包者或参与者）
 
-### 费用
-
-| 费用 | 金额 | 说明 |
-|------|------|------|
-| 参与费 | 由发红包者设定 (≥1 AXON) | 暗标时支付，归发红包者 |
-| 抢到手续费 | 2% | 从抢到的金额中扣 |
-
 ---
 
 ## 操作指南: 抢红包
@@ -117,7 +103,7 @@ from eth_abi import encode, decode
 from eth_utils import keccak
 
 RPC = "https://mainnet-rpc.axonchain.ai/"
-CONTRACT = "0x702C218E0c596F7b87D5328d35dE52D0e868Fb23"
+CONTRACT = "0x4403151f09af3d0a3e8044437916cc982effc86c"
 
 def rpc_call(method, params):
     r = requests.post(RPC, json={"jsonrpc": "2.0", "method": method, "params": params, "id": 1})
@@ -140,21 +126,20 @@ def get_packet(packet_id):
         "creator": "0x" + raw[24:64],
         "totalAmount": fields[1] / 1e18,
         "remaining": fields[2] / 1e18,
-        "entryFee": fields[3] / 1e18,
-        "commitDeadline": fields[4],
-        "revealDeadline": fields[5],
-        "participants": fields[6],
-        "reveals": fields[7],
-        "settled": fields[8] == 1,
+        "commitDeadline": fields[3],
+        "revealDeadline": fields[4],
+        "participants": fields[5],
+        "reveals": fields[6],
+        "settled": fields[7] == 1,
     }
 
-# 检查哪些红包在 commit 阶段（可以参与）
+# 检查哪些红包可以参与
 current_block = int(rpc_call("eth_blockNumber", [])["result"], 16)
 for i in range(next_id):
     p = get_packet(i)
     if not p["settled"] and current_block <= p["commitDeadline"]:
-        print(f"红包 #{i}: {p['totalAmount']} AXON, 参与费 {p['entryFee']} AXON, "
-              f"已有 {p['participants']} 人, commit 截止块 {p['commitDeadline']}")
+        print(f"红包 #{i}: {p['totalAmount']} AXON, "
+              f"已有 {p['participants']} 人, 暗标截止块 {p['commitDeadline']}")
 ```
 
 ### 第二步: 决定出价并暗标
@@ -170,7 +155,7 @@ wallet = Account.from_key(PRIVATE_KEY)
 # 决定出价
 PACKET_ID = 0                    # 要参与的红包 ID
 BID_AMOUNT = int(5e18)           # 出价 5 AXON（单位 wei）
-SECRET = int.from_bytes(os.urandom(16), "big")  # 随机秘密数
+SECRET = int.from_bytes(os.urandom(16), "big")  # 秘密随机数
 
 # 计算 Poseidon 承诺
 POSEIDON = "0x0000000000000000000000000000000000000810"
@@ -180,11 +165,10 @@ r = rpc_call("eth_call", [{"to": POSEIDON, "data": data}, "latest"])
 commitment = r["result"]  # bytes32 承诺值
 
 print(f"出价: {BID_AMOUNT / 1e18} AXON")
-print(f"秘密: {SECRET} (保存好，reveal 时需要!)")
+print(f"秘密随机数: {SECRET} (保存好，揭示时需要!)")
 print(f"承诺: {commitment}")
 
-# 发送 commit 交易
-ENTRY_FEE = int(1e18)  # 参与费（从红包信息获取）
+# 发送暗标交易
 sel_commit = keccak(b"commit(uint256,bytes32)")[:4]
 tx_data = "0x" + sel_commit.hex() + encode(["uint256", "bytes32"], [PACKET_ID, bytes.fromhex(commitment[2:])]).hex()
 
@@ -193,7 +177,7 @@ tx = {
     "nonce": nonce,
     "to": CONTRACT,
     "data": tx_data,
-    "value": ENTRY_FEE,           # 参与费
+    "value": 0,                   # 免费参与
     "gas": 300000,
     "gasPrice": 1000000000,
     "chainId": 8210,
@@ -202,9 +186,9 @@ signed = Account.sign_transaction(tx, PRIVATE_KEY)
 raw = signed.raw_transaction.hex()
 if not raw.startswith("0x"): raw = "0x" + raw
 result = rpc_call("eth_sendRawTransaction", [raw])
-print(f"Commit TX: {result.get('result', result)}")
+print(f"暗标 TX: {result.get('result', result)}")
 
-# ⚠️ 保存 SECRET! 不保存就无法揭示，参与费白丢
+# ⚠️ 保存秘密随机数! 不保存就无法揭示
 ```
 
 ### 第三步: 等暗标阶段结束，然后揭示
@@ -232,7 +216,7 @@ signed = Account.sign_transaction(tx, PRIVATE_KEY)
 raw = signed.raw_transaction.hex()
 if not raw.startswith("0x"): raw = "0x" + raw
 result = rpc_call("eth_sendRawTransaction", [raw])
-print(f"Reveal TX: {result.get('result', result)}")
+print(f"揭示 TX: {result.get('result', result)}")
 ```
 
 ### 第四步: 等揭示结束，开奖 + 提取
@@ -264,12 +248,11 @@ if winnings > 0:
 
 ### 参数说明
 
-`createPacket(entryFee, commitBlocks, revealBlocks)` + `msg.value` = 红包金额
+`createPacket(commitBlocks, revealBlocks)` + `msg.value` = 红包金额
 
 | 参数 | 含义 | 最小值 |
 |------|------|--------|
 | `msg.value` | 红包总金额 | 10 AXON |
-| `entryFee` | 每人参与费 | 1 AXON |
 | `commitBlocks` | 暗标窗口（区块数） | 10 |
 | `revealBlocks` | 揭示窗口（区块数） | 10 |
 
@@ -284,21 +267,19 @@ if winnings > 0:
 
 ### 无人参与怎么办
 
-- 没人 commit → reveal 结束后发红包者调 `creatorReclaim(packetId)` → 全额拿回红包，无损失
-- 有人 commit 但没 reveal → 参与费归发红包者，红包金额全额退回
-- 有人揭示了 → 必须走 `settle()` 开奖流程正常结算
+- 没人暗标 → 揭示结束后发红包者调 `creatorReclaim(packetId)` → 全额拿回，无损失
+- 有人揭示了 → 必须走 `settle()` 开奖流程正常结算，没被抢完的部分退给发红包者
 
 ### 创建红包
 
 ```python
-# 发一个 50 AXON 的红包，参与费 2 AXON，commit 窗口 30 块(~2.5min)，reveal 窗口 20 块(~1.5min)
-sel = keccak(b"createPacket(uint256,uint256,uint256)")[:4]
+# 发一个 50 AXON 的红包，暗标窗口 60 块(~5min)，揭示窗口 60 块(~5min)
+sel = keccak(b"createPacket(uint256,uint256)")[:4]
 tx_data = "0x" + sel.hex() + encode(
-    ["uint256", "uint256", "uint256"],
+    ["uint256", "uint256"],
     [
-        int(2e18),   # 参与费 2 AXON
-        30,          # commit 窗口 30 块
-        20,          # reveal 窗口 20 块
+        60,          # 暗标窗口 60 块
+        60,          # 揭示窗口 60 块
     ]
 ).hex()
 
@@ -316,14 +297,13 @@ signed = Account.sign_transaction(tx, PRIVATE_KEY)
 raw = signed.raw_transaction.hex()
 if not raw.startswith("0x"): raw = "0x" + raw
 result = rpc_call("eth_sendRawTransaction", [raw])
-print(f"Create TX: {result.get('result', result)}")
-# 从 PacketCreated 事件中获取 packetId
+print(f"创建 TX: {result.get('result', result)}")
 ```
 
-### 结算后提取余额和参与费
+### 开奖后取回余额
 
 ```python
-# 开奖后，发红包者调 creatorWithdraw 取回未被抢完的部分 + 参与费
+# 开奖后，发红包者调 creatorWithdraw 取回未被抢完的部分
 sel = keccak(b"creatorWithdraw(uint256)")[:4]
 tx_data = "0x" + sel.hex() + encode(["uint256"], [PACKET_ID]).hex()
 # ... 发送交易 ...
@@ -373,7 +353,7 @@ def adaptive_bid(total_amount, num_participants, past_rounds):
 
 ```python
 """
-自动抢红包 Bot — 监听新红包，自动参与，自动 reveal，自动提取
+自动抢红包 Bot — 监听新红包，自动参与，自动揭示，自动提取
 """
 import os, time, requests
 from eth_account import Account
@@ -381,7 +361,7 @@ from eth_abi import encode
 from eth_utils import keccak
 
 RPC = "https://mainnet-rpc.axonchain.ai/"
-CONTRACT = "0x702C218E0c596F7b87D5328d35dE52D0e868Fb23"
+CONTRACT = "0x4403151f09af3d0a3e8044437916cc982effc86c"
 POSEIDON = "0x0000000000000000000000000000000000000810"
 CHAIN_ID = 8210
 PRIVATE_KEY = os.environ["AXON_PRIVATE_KEY"]
@@ -415,16 +395,14 @@ def get_packet(pid):
     r = rpc("eth_call", [{"to": CONTRACT, "data": d}, "latest"])
     raw = r["result"][2:]
     f = [int(raw[i:i+64], 16) for i in range(0, len(raw), 64)]
-    return {"total": f[1], "entry_fee": f[3], "commit_dl": f[4],
-            "reveal_dl": f[5], "participants": f[6], "settled": f[8] == 1}
+    return {"total": f[1], "commit_dl": f[3],
+            "reveal_dl": f[4], "participants": f[5], "settled": f[7] == 1}
 
-# 状态: 已 commit 但未 reveal 的红包
+# 状态: 已暗标但未揭示的红包
 pending_reveals = {}  # {packet_id: {"amount": ..., "secret": ...}}
-
 seen_packets = 0
 
 print(f"🤖 Bot 启动: {wallet.address}")
-print(f"   合约: {CONTRACT}")
 
 while True:
     try:
@@ -432,14 +410,14 @@ while True:
         next_id = int(rpc("eth_call", [{"to": CONTRACT,
             "data": "0x" + keccak(b"nextPacketId()")[:4].hex()}, "latest"])["result"], 16)
 
-        # 发现新红包 → 自动 commit
+        # 发现新红包 → 自动暗标
         for pid in range(seen_packets, next_id):
             p = get_packet(pid)
             if p["settled"] or block > p["commit_dl"]:
                 continue
 
             # 计算出价: 均分的 85%
-            n = max(p["participants"] + 1, 3)  # 预估至少 3 人
+            n = max(p["participants"] + 1, 3)
             bid = int(p["total"] * 0.85 / n)
             bid = max(bid, int(1e18))  # 至少 1 AXON
             secret = int.from_bytes(os.urandom(16), "big")
@@ -449,26 +427,26 @@ while True:
             data = "0x" + sel.hex() + encode(["uint256", "bytes32"],
                 [pid, bytes.fromhex(commitment[2:])]).hex()
 
-            result = send_tx(data, value=p["entry_fee"], gas=300000)
+            result = send_tx(data, gas=300000)
             if "result" in result:
                 pending_reveals[pid] = {"amount": bid, "secret": secret, "reveal_dl": p["reveal_dl"]}
-                print(f"🔒 Commit 红包#{pid}: 出价 {bid/1e18:.1f} AXON")
+                print(f"🔒 暗标 红包#{pid}: 出价 {bid/1e18:.1f} AXON")
 
         seen_packets = next_id
 
-        # 检查待 reveal 的红包
+        # 检查待揭示的红包
         for pid in list(pending_reveals.keys()):
             info = pending_reveals[pid]
             p = get_packet(pid)
 
             if block > p["commit_dl"] and block <= info["reveal_dl"]:
-                # reveal 阶段 → 揭示
+                # 揭示阶段 → 揭示
                 sel = keccak(b"reveal(uint256,uint256,uint256)")[:4]
                 data = "0x" + sel.hex() + encode(["uint256", "uint256", "uint256"],
                     [pid, info["amount"], info["secret"]]).hex()
                 result = send_tx(data, gas=500000)
                 if "result" in result:
-                    print(f"🔓 Reveal 红包#{pid}: {info['amount']/1e18:.1f} AXON")
+                    print(f"🔓 揭示 红包#{pid}: {info['amount']/1e18:.1f} AXON")
                     pending_reveals[pid]["revealed"] = True
 
             elif block > info["reveal_dl"] and not p["settled"]:
@@ -479,7 +457,7 @@ while True:
                 print(f"🎲 开奖 红包#{pid}")
 
             elif p["settled"]:
-                # 已结算 → 检查赢额并提取
+                # 已开奖 → 检查赢额并提取
                 sel = keccak(b"getMyWinnings(uint256,address)")[:4]
                 d = "0x" + sel.hex() + encode(["uint256", "address"], [pid, wallet.address]).hex()
                 r = rpc("eth_call", [{"to": CONTRACT, "data": d}, "latest"])
@@ -512,8 +490,8 @@ python bot.py
 
 | 事件 | 含义 |
 |------|------|
-| `PacketCreated(packetId, creator, amount, entryFee, commitDeadline, revealDeadline)` | 新红包创建 |
-| `Committed(packetId, participant)` | 有人参与 |
+| `PacketCreated(packetId, creator, amount, commitDeadline, revealDeadline)` | 新红包创建 |
+| `Committed(packetId, participant)` | 有人暗标 |
 | `Revealed(packetId, participant)` | 有人揭示 |
 | `Grabbed(packetId, participant, amount, order)` | 抢到了 |
 | `Greedy(packetId, participant, amount, order)` | 太贪了，空手 |
@@ -532,5 +510,5 @@ python bot.py
 
 ## 源码
 
-- 合约: [DarkRedPacket.sol](https://github.com/agent-0x/axon-games/blob/master/contracts/DarkRedPacket.sol)
-- ABI: [DarkRedPacket.json](https://github.com/agent-0x/axon-games/blob/master/abi/DarkRedPacket.json)
+- 合约: [DarkRedPacket.sol](https://github.com/agent-0x/axon-dark-red-packet/blob/master/contracts/DarkRedPacket.sol)
+- ABI: [DarkRedPacket.json](https://github.com/agent-0x/axon-dark-red-packet/blob/master/abi/DarkRedPacket.json)

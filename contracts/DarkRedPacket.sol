@@ -24,7 +24,6 @@ contract DarkRedPacket {
     address public owner;
     uint256 public feeBps = 200; // 2% 手续费归合约 owner
     uint256 public minPacketAmount = 10 ether; // 最小红包 10 AXON
-    uint256 public minEntryFee = 1 ether; // 最小参与费 1 AXON
     uint256 public maxParticipants = 50; // 最大参与人数
 
     // ============ 红包状态 ============
@@ -32,7 +31,6 @@ contract DarkRedPacket {
         address creator;
         uint256 totalAmount;
         uint256 remaining;
-        uint256 entryFee;
         uint256 commitDeadline;
         uint256 revealDeadline;
         uint256 participantCount;
@@ -67,7 +65,7 @@ contract DarkRedPacket {
     bool private _locked;
 
     // ============ 事件 ============
-    event PacketCreated(uint256 indexed packetId, address indexed creator, uint256 amount, uint256 entryFee, uint256 commitDeadline, uint256 revealDeadline);
+    event PacketCreated(uint256 indexed packetId, address indexed creator, uint256 amount, uint256 commitDeadline, uint256 revealDeadline);
     event Committed(uint256 indexed packetId, address indexed participant);
     event Revealed(uint256 indexed packetId, address indexed participant);
     event Settled(uint256 indexed packetId, uint256 totalGrabbed, uint256 returnedToCreator, uint256 fee);
@@ -91,12 +89,10 @@ contract DarkRedPacket {
 
     // ============ 庄家: 创建红包 ============
     function createPacket(
-        uint256 entryFee,
         uint256 commitBlocks,
         uint256 revealBlocks
     ) external payable returns (uint256 packetId) {
         require(msg.value >= minPacketAmount, "too small");
-        require(entryFee >= minEntryFee, "entry fee too low");
         require(commitBlocks >= 10, "commit window too short");
         require(revealBlocks >= 10, "reveal window too short");
 
@@ -105,7 +101,6 @@ contract DarkRedPacket {
             creator: msg.sender,
             totalAmount: msg.value,
             remaining: msg.value,
-            entryFee: entryFee,
             commitDeadline: block.number + commitBlocks,
             revealDeadline: block.number + commitBlocks + revealBlocks,
             participantCount: 0,
@@ -115,17 +110,16 @@ contract DarkRedPacket {
             settled: false
         });
 
-        emit PacketCreated(packetId, msg.sender, msg.value, entryFee, block.number + commitBlocks, block.number + commitBlocks + revealBlocks);
+        emit PacketCreated(packetId, msg.sender, msg.value, block.number + commitBlocks, block.number + commitBlocks + revealBlocks);
     }
 
     // ============ 参与者: 提交密封出价 ============
-    function commit(uint256 packetId, bytes32 commitment) external payable {
+    function commit(uint256 packetId, bytes32 commitment) external {
         Packet storage p = packets[packetId];
         require(block.number <= p.commitDeadline, "commit closed");
         require(commitments[packetId][msg.sender] == bytes32(0), "already committed");
         require(commitment != bytes32(0), "empty commitment");
         require(p.participantCount < maxParticipants, "packet full");
-        require(msg.value == p.entryFee, "wrong entry fee");
 
         commitments[packetId][msg.sender] = commitment;
         p.participantCount += 1;
@@ -214,12 +208,10 @@ contract DarkRedPacket {
         treasury += actualFee;
         p.remaining = remaining;
 
-        // 庄家可提取: 红包余额 + revealed 参与者的参与费
-        // 未 reveal 参与者的参与费留在合约供 refundEntry 退回
-        uint256 revealedEntryFees = p.entryFee * p.revealCount;
-        creatorClaimable[packetId] = remaining + revealedEntryFees;
+        // 发红包者可提取: 红包余额（没被抢完的部分）
+        creatorClaimable[packetId] = remaining;
 
-        emit Settled(packetId, totalGrabbed, remaining + revealedEntryFees, actualFee);
+        emit Settled(packetId, totalGrabbed, remaining, actualFee);
     }
 
     // ============ 庄家提取: settle 后庄家取回余额和参与费 ============
@@ -248,9 +240,7 @@ contract DarkRedPacket {
         p.settled = true;
         p.remaining = 0;
 
-        // 红包金额 + 所有参与者的参与费（revealed 的人也退参与费）
-        uint256 totalEntryFees = p.entryFee * p.participantCount;
-        creatorClaimable[packetId] = p.totalAmount + totalEntryFees;
+        creatorClaimable[packetId] = p.totalAmount;
     }
 
     // ============ 赢家: 提取奖金 ============
@@ -269,33 +259,11 @@ contract DarkRedPacket {
         emit Withdrawn(packetId, msg.sender, amount);
     }
 
-    // ============ 参与者: 退回参与费 ============
-    // 未 reveal 的人: reveal 结束后随时可退
-    // 已 reveal 的人: 仅当红包被 creatorReclaim（failed 状态）时可退
-    function refundEntry(uint256 packetId) external noReentrant {
-        Packet storage p = packets[packetId];
-        require(block.number > p.revealDeadline, "reveal not ended");
-        require(p.entryFee > 0, "no entry fee");
-        require(commitments[packetId][msg.sender] != bytes32(0), "not committed");
-        require(!hasWithdrawn[packetId][msg.sender], "already refunded");
-
-        if (hasRevealed[packetId][msg.sender]) {
-            // revealed 玩家只能在 failed reclaim 后退费（正常 settle 后不能退）
-            require(p.settled && winnings[packetId][msg.sender] == 0 && creatorClaimable[packetId] > 0, "not eligible");
-        }
-
-        hasWithdrawn[packetId][msg.sender] = true;
-
-        (bool ok, ) = msg.sender.call{value: p.entryFee}("");
-        require(ok, "refund failed");
-    }
-
     // ============ 查询 ============
     function getPacketInfo(uint256 packetId) external view returns (
         address creator,
         uint256 totalAmount,
         uint256 remaining,
-        uint256 entryFee,
         uint256 commitDeadline,
         uint256 revealDeadline,
         uint256 participantCount,
@@ -303,7 +271,7 @@ contract DarkRedPacket {
         bool settled
     ) {
         Packet storage p = packets[packetId];
-        return (p.creator, p.totalAmount, p.remaining, p.entryFee,
+        return (p.creator, p.totalAmount, p.remaining,
                 p.commitDeadline, p.revealDeadline, p.participantCount, p.revealCount, p.settled);
     }
 

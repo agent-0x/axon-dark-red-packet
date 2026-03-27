@@ -41,7 +41,7 @@ https://raw.githubusercontent.com/agent-0x/axon-dark-red-packet/master/skills/da
 
 | 合约 | 地址 |
 |------|------|
-| 暗池红包 | `0x702C218E0c596F7b87D5328d35dE52D0e868Fb23` |
+| 暗池红包 | `0x4403151f09af3d0a3e8044437916cc982effc86c` |
 | Poseidon 预编译 | `0x0000000000000000000000000000000000000810` |
 
 ## 目录
