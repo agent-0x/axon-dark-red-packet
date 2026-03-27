@@ -206,6 +206,32 @@ if winnings > 0:
 
 ## 操作指南: 发红包
 
+### 参数说明
+
+`createPacket(entryFee, commitBlocks, revealBlocks)` + `msg.value` = 红包金额
+
+| 参数 | 含义 | 最小值 |
+|------|------|--------|
+| `msg.value` | 红包总金额 | 10 AXON |
+| `entryFee` | 每人参与费 | 1 AXON |
+| `commitBlocks` | 暗标窗口（区块数） | 10 |
+| `revealBlocks` | 揭示窗口（区块数） | 10 |
+
+**时间参考（每块 ~5 秒）：**
+
+| 区块数 | 时间 | 建议场景 |
+|--------|------|---------|
+| 12 | ~1 分钟 | 快速测试 |
+| 60 | ~5 分钟 | 常规红包 |
+| 120 | ~10 分钟 | 大红包，等更多人 |
+| 720 | ~1 小时 | 超大红包活动 |
+
+### 无人参与怎么办
+
+- 没人 commit → reveal 结束后庄家调 `creatorReclaim(packetId)` → 全额拿回红包，无损失
+- 有人 commit 但没 reveal → 参与费归庄家，红包金额全额退回
+- 有人 reveal → 必须走 `settle()` 流程正常结算
+
 ### 创建红包
 
 ```python

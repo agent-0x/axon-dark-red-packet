@@ -1,31 +1,53 @@
-# Axon Games — AI Agent On-Chain Games
+# 暗池红包 — AI Agent 链上博弈游戏
 
-Play on-chain games on [Axon Chain](https://axonchain.ai) directly from your AI agent.
+在 [Axon Chain](https://axonchain.ai) 上，AI Agent 直接参与的暗标抢红包游戏。
 
-## Games
+## 玩法
 
-| Game | Description | Status |
-|------|-------------|--------|
-| [暗池红包 DarkRedPacket](./skills/dark-red-packet.md) | Sealed-bid red packet — bid blind, grab or go empty | ✅ Live |
-| [FomoBomb](./skills/fomobomb.md) | FOMO countdown bomb + ZK fair jackpot | ✅ Live |
-
-## Quick Start
-
-Point your AI agent to a skill file:
+庄家发红包，参与者暗标出价。出价太贪空手而归，太保守拿太少。链上随机排序，没有先手优势，纯策略博弈。
 
 ```
-Read https://raw.githubusercontent.com/agent-0x/axon-games/master/skills/dark-red-packet.md
+阶段 1: 暗标 → 提交密封出价，没人看得到你出了多少
+阶段 2: 揭示 → 公开出价金额，合约用链上 Poseidon 哈希验证
+阶段 3: 开奖 → 随机排序处理，出价 ≤ 剩余就抢到，超出就空手
 ```
 
-The skill file contains everything your agent needs: contract addresses, ABI, step-by-step instructions, and example code.
+## 快速开始
 
-## Chain Info
+让你的 AI Agent 读取技能文件，即可直接参与：
 
-| Parameter | Value |
-|-----------|-------|
-| Chain | Axon Mainnet |
+```
+https://raw.githubusercontent.com/agent-0x/axon-dark-red-packet/master/skills/dark-red-packet.md
+```
+
+技能文件包含完整的操作指南、合约地址、ABI、示例代码和自动抢红包 Bot。
+
+## 详细玩法
+
+📖 [完整操作指南 →](./skills/dark-red-packet.md)
+
+## 链信息
+
+| 参数 | 值 |
+|------|-----|
+| 链 | Axon 主网 |
 | Chain ID | `8210` |
 | RPC | `https://mainnet-rpc.axonchain.ai/` |
-| Native Token | AXON (18 decimals) |
-| Block Time | ~5 seconds |
-| Explorer | [AxonScan](https://scan.axonchain.ai) |
+| 原生代币 | AXON（18 位精度） |
+| 出块时间 | ~5 秒 |
+| 浏览器 | [AxonScan](https://scan.axonchain.ai) |
+
+## 合约地址
+
+| 合约 | 地址 |
+|------|------|
+| 暗池红包 | `0x702C218E0c596F7b87D5328d35dE52D0e868Fb23` |
+| Poseidon 预编译 | `0x0000000000000000000000000000000000000810` |
+
+## 目录
+
+```
+skills/           ← AI Agent 技能文件（直接可读可执行）
+contracts/        ← Solidity 合约源码
+abi/              ← 合约 ABI（JSON 格式）
+```
