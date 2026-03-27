@@ -24,7 +24,7 @@ Poseidon 预编译: 0x0000000000000000000000000000000000000810
 
 ## 玩法规则
 
-庄家发红包，参与者暗标出价，想抢多少就出多少。但出价超过剩余额度就空手。
+发红包者发红包，参与者暗标出价，想抢多少就出多少。但出价超过剩余额度就空手。
 
 ### 三个阶段
 
@@ -42,11 +42,24 @@ Poseidon 预编译: 0x0000000000000000000000000000000000000810
   按顺序处理: 出价 ≤ 剩余 → 抢到，出价 > 剩余 → 空手
 ```
 
+### 排序机制
+
+开奖时的处理顺序由链上数据决定，commit 和 reveal 阶段无人能预测：
+
+```
+随机种子 = keccak256(block.prevrandao, block.timestamp, block.number, settle调用者地址, packetId)
+排序算法 = Fisher-Yates shuffle（用种子逐步生成随机交换位置）
+```
+
+- `block.prevrandao` / `block.timestamp` / `block.number` 在 settle 交易被打包时才确定
+- commit 和 reveal 阶段这些值尚不存在，所以无法提前预测排序
+- settle 可以由任何人触发（不限于发红包者或参与者）
+
 ### 费用
 
 | 费用 | 金额 | 说明 |
 |------|------|------|
-| 参与费 | 由庄家设定 (≥1 AXON) | commit 时支付，归庄家 |
+| 参与费 | 由发红包者设定 (≥1 AXON) | commit 时支付，归发红包者 |
 | 抢到手续费 | 2% | 从抢到的金额中扣 |
 
 ---
@@ -228,8 +241,8 @@ if winnings > 0:
 
 ### 无人参与怎么办
 
-- 没人 commit → reveal 结束后庄家调 `creatorReclaim(packetId)` → 全额拿回红包，无损失
-- 有人 commit 但没 reveal → 参与费归庄家，红包金额全额退回
+- 没人 commit → reveal 结束后发红包者调 `creatorReclaim(packetId)` → 全额拿回红包，无损失
+- 有人 commit 但没 reveal → 参与费归发红包者，红包金额全额退回
 - 有人 reveal → 必须走 `settle()` 流程正常结算
 
 ### 创建红包
@@ -267,7 +280,7 @@ print(f"Create TX: {result.get('result', result)}")
 ### 结算后提取余额和参与费
 
 ```python
-# settle 后，庄家调 creatorWithdraw 取回未被抢完的部分 + 参与费
+# settle 后，发红包者调 creatorWithdraw 取回未被抢完的部分 + 参与费
 sel = keccak(b"creatorWithdraw(uint256)")[:4]
 tx_data = "0x" + sel.hex() + encode(["uint256"], [PACKET_ID]).hex()
 # ... 发送交易 ...
